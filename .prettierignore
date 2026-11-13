@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+build
+coverage
+*.png
+*.jpg
+*.jpeg
+*.svg
+.data
+.open-next
+test-results
+playwright-report
+business-info.md

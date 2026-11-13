@@ -1,0 +1,10 @@
+export { HeroSection } from "./HeroSection";
+export { IntroSection } from "./IntroSection";
+export { PillarsSection } from "./PillarsSection";
+export { TrainingSection } from "./TrainingSection";
+export { StatsBandSection } from "./StatsBandSection";
+export { FacilitiesBentoSection } from "./FacilitiesBentoSection";
+export { TransformationsSection } from "./TransformationsSection";
+export { TestimonialsSection } from "./TestimonialsSection";
+export { BranchCardsSection } from "./BranchCardsSection";
+export { FinalCTASection } from "./FinalCTASection";

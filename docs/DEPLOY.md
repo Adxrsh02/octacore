@@ -34,32 +34,26 @@ OCTACORE Fitness is engineered as a modern Next.js 15 App Router application opt
 
 Before deploying, ensure you have access to the [Cloudflare Dashboard](https://dash.cloudflare.com/) and create the following resources:
 
-### 2.1 KV Namespace for Lead Backup
+### 2.1 Provisioned KV Namespace for Lead Backup
 
-```bash
-# Create production KV namespace
-npx wrangler kv namespace create OCTACORE_LEADS_KV
+The KV namespaces are provisioned under Cloudflare Account ID `3b0cbdf1f5fa5afc59dc75ce0cbb075c`:
 
-# Create preview KV namespace
-npx wrangler kv namespace create OCTACORE_LEADS_KV --preview
-```
+- **Production ID**: `08e07cca2ca540059f12c52314a8d866`
+- **Preview ID**: `8dffc80f29a24d7b8af697502cefff0b`
 
-_Note the returned namespace IDs and update them in `wrangler.jsonc`._
+### 2.2 Provisioned D1 Database for Relational Lead Storage
 
-### 2.2 D1 Database (Optional Relational Backup)
+The D1 database is provisioned and migrated under Cloudflare Account ID `3b0cbdf1f5fa5afc59dc75ce0cbb075c`:
 
-```bash
-# Create D1 database
-npx wrangler d1 create octacore-db
-```
-
-_Update `database_id` in `wrangler.jsonc`._
+- **Database Name**: `octacore-db`
+- **Database ID**: `8da97fb8-1462-425c-a738-3659305f0b39`
+- **Schema Migration**: Run `npm run db:migrate` or `npx wrangler d1 execute octacore-db --file=./scripts/d1-schema.sql --remote`
 
 ---
 
 ## 3. Environment Variables & Secrets Inventory
 
-Set these variables in the Cloudflare Dashboard under **Workers & Pages > octacore-fitness > Settings > Variables & Secrets** (or via `wrangler secret put <KEY>`):
+Set these variables in the Cloudflare Dashboard under **Workers & Pages > octacore > Settings > Variables & Secrets** (or via `wrangler secret put <KEY>`):
 
 | Variable / Secret                           | Type       | Description                        | Production Example                             |
 | ------------------------------------------- | ---------- | ---------------------------------- | ---------------------------------------------- |

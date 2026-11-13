@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enquirySchema } from "@/lib/validation/enquiry";
 import { Resend } from "resend";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import fs from "fs";
 import path from "path";
 
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
       timeZone: "Asia/Kolkata",
     }).format(new Date());
 
-    // 7. Store Lead in Backup Storage (Local / D1 / KV)
+    // 7. Store Lead in Backup Storage (Cloudflare KV & D1 / Local Filesystem)
     try {
       const backupEntry = {
         id: leadId,
@@ -158,22 +159,74 @@ export async function POST(request: NextRequest) {
         ...leadData,
       };
 
-      // Persistent backup in local environment
-      const backupDir = path.join(process.cwd(), ".data");
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
+      let storedInCloudflare = false;
+
+      // Persist in Cloudflare KV & D1 if available
+      try {
+        const { env } = await getCloudflareContext({ async: true });
+        const cfEnv = env as {
+          OCTACORE_LEADS_KV?: { put: (key: string, value: string) => Promise<void> };
+          OCTACORE_DB?: {
+            prepare: (query: string) => {
+              bind: (...args: unknown[]) => { run: () => Promise<unknown> };
+            };
+          };
+        };
+
+        if (cfEnv?.OCTACORE_LEADS_KV) {
+          await cfEnv.OCTACORE_LEADS_KV.put(`lead:${leadId}`, JSON.stringify(backupEntry));
+          storedInCloudflare = true;
+        }
+
+        if (cfEnv?.OCTACORE_DB) {
+          try {
+            await cfEnv.OCTACORE_DB.prepare(
+              `INSERT INTO leads (id, full_name, mobile_number, preferred_branch, fitness_goal, membership_interest, preferred_contact_time, ip, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+              .bind(
+                leadId,
+                leadData.fullName,
+                leadData.mobileNumber,
+                leadData.preferredBranch,
+                leadData.fitnessGoal,
+                leadData.membershipInterest,
+                leadData.preferredContactTime,
+                ip,
+                timestampISO
+              )
+              .run();
+            storedInCloudflare = true;
+          } catch (d1Err) {
+            console.warn("D1 lead storage warning:", d1Err);
+          }
+        }
+      } catch {
+        // Not running in Cloudflare worker context
       }
-      const backupFile = path.join(backupDir, "leads.json");
-      let leadsList: unknown[] = [];
-      if (fs.existsSync(backupFile)) {
+
+      // Persistent backup in local development environment
+      if (!storedInCloudflare && process.env.NODE_ENV === "development") {
         try {
-          leadsList = JSON.parse(fs.readFileSync(backupFile, "utf8"));
+          const backupDir = path.join(process.cwd(), ".data");
+          if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+          }
+          const backupFile = path.join(backupDir, "leads.json");
+          let leadsList: unknown[] = [];
+          if (fs.existsSync(backupFile)) {
+            try {
+              leadsList = JSON.parse(fs.readFileSync(backupFile, "utf8"));
+            } catch {
+              leadsList = [];
+            }
+          }
+          leadsList.push(backupEntry);
+          fs.writeFileSync(backupFile, JSON.stringify(leadsList, null, 2));
         } catch {
-          leadsList = [];
+          // Non-fatal filesystem logging
         }
       }
-      leadsList.push(backupEntry);
-      fs.writeFileSync(backupFile, JSON.stringify(leadsList, null, 2));
     } catch (storageErr) {
       // Non-fatal logging for storage backup
       console.warn("Backup lead storage note:", storageErr);
